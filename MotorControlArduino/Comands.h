@@ -1,12 +1,23 @@
-struct NewComand
+enum DriveTypes
 {
-  int whatComand;
+  DriveTypesStop=0,
+  DriveTypesDriveToPos = 1, 
+  DriveTypesDriveWithSpeed =2, 
+  DriveTypesGetActiveParams =3, 
+};
+
+struct CommandGCodeForMotor
+{
+  DriveTypes whatComand;
   int motorNumber;
-  int motorNumber2;
 
   int motorTarget;
   int motorSpeed;
-  int motorSpeed2;
+};
+
+struct CommandGCode
+{
+  std::vector<CommandGCodeForMotor> Commands;
 };
 
 // testmode
@@ -14,13 +25,30 @@ struct NewComand
 // testpin-5,1;
 // testto-6,200,500;
 // newspeed-1,200;
+
+//MotorName MotorNummer
+//x         1
+//y         2
+//z         3
+//a         4
+//b         5
+//c         6
+
+//G01 --> auf pos fahren
+//M03 --> vorwärts
+//M04 --> rückwärts
+
+// F+Motorname(speed)
+// Motorname(zielpos)
+
 class Comands
 {
     public:
-      void AnalyseOrder(String Order,NewComand* com);
+      void AnalyseOrder(String Order,CommandGCode* com);
       void Tick();
       void CheckForAutoPowerON();
-      void Initializieren(uint16_t indexSleepPin);
+      void initializeSleepPin(uint16_t indexSleepPin);
+      void initializePin(uint16_t indexPin);
       void AddMotorModus(uint16_t* modusNewMotor);
 
     private:
@@ -37,9 +65,16 @@ class Comands
 
       uint16_t sleepPin = 0;
       std::vector<uint16_t*> motorTreiberModus;
+      std::vector<CommandGCode> commandsToWork;
 };
 
-void Comands::Initializieren(uint16_t indexSleepPin) 
+void Comands::initializePin(uint16_t indexPin) 
+{
+  pinMode(indexPin,OUTPUT);
+  digitalWrite(indexPin, LOW);
+}
+
+void Comands::initializeSleepPin(uint16_t indexSleepPin) 
 {
   sleepPin=indexSleepPin;
   pinMode(sleepPin,OUTPUT);
@@ -84,7 +119,6 @@ void Comands::Tick()
 
 void Comands::CheckForAutoPowerON()
 {
-  
   if(testMode==false)
   {
     bool sleepOn=false;
@@ -124,29 +158,34 @@ void Comands::CheckForAutoPowerON()
     }
   }
 }
-void Comands::AnalyseOrder(String Order,NewComand* com)
+
+void Comands::AnalyseOrder(String Order,CommandGCode* com)
 {
+  bool WriteOrder=true;
   if(Order.length()==0)
   {
     return;
   }
   //Serial.print("I received: ");
-  Serial.println(Order);
+  
   if(Order.indexOf("testmode") == 0)
   {
+    WriteOrder=false;
     Serial.print("Testmode online");
     testMode=true;
   }
   if(Order.indexOf("testpin") == 0)
   {
+    WriteOrder=false;
+    Serial.println(Order);
     //seperate nachricht
-    // "Comando"-"pinnumber","0oder1";
+    // "Comando"-"pinnumber","0oder1"
     int cmdPos = Order.indexOf("-");
     int pinNummerPos = Order.indexOf(",");
   
     String cmdText = Order.substring(0,cmdPos);
     String pinNummerText= Order.substring(cmdPos + 1, pinNummerPos);
-    String zustandsText = Order.substring(pinNummerPos + 1, Order.length());
+    String zustandsText = Order.substring(pinNummerPos + 1, Order.length()-1);
     
     int pinNummer = pinNummerText.toInt();
     int highorlow = zustandsText.toInt();
@@ -166,8 +205,10 @@ void Comands::AnalyseOrder(String Order,NewComand* com)
   }
   if(Order.indexOf("testto") == 0)
   {
+    WriteOrder=false;
+    Serial.println(Order);
     //seperate nachricht
-    // "Comando"-"pinnumber","speed","anzahlsteps";
+    // "Comando"-"pinnumber","speed","anzahlsteps"
     int cmdPos = Order.indexOf("-");
     int pinNummerPos = Order.indexOf(",");
     int speedNummerPos = Order.indexOf(",",pinNummerPos+1);
@@ -186,102 +227,83 @@ void Comands::AnalyseOrder(String Order,NewComand* com)
     tooglePIN=pinNummer;
     interval_us=speedTimer;    
     steepsMax= steepsNumber;
+    return;
   }
-  //Motorfahren
-  if(Order.indexOf("to") == 0)
-  {
-    //seperate nachricht
-    // "Comando"-"motorNumber","motorTarget";
-    int cmdPos = Order.indexOf("-");
-    int pinMotorPos = Order.indexOf(",");
-  
-    String pinMotorText= Order.substring(cmdPos + 1, pinMotorPos);
-    String targetText = Order.substring(pinMotorPos + 1, Order.length()-1);
-
-    com->whatComand=1;
-    com->motorNumber=pinMotorText.toInt();
-    com->motorTarget = targetText.toInt(); 
-  }
-
-  if(Order.indexOf("newspeed") == 0)
-  {
-    //seperate nachricht
-    // "Comando"-"motorNumber","motorSpeed";
-    int cmdPos = Order.indexOf("-");
-    int pinMotorPos = Order.indexOf(",");
-  
-    String pinMotorText= Order.substring(cmdPos + 1, pinMotorPos);
-    String speedText = Order.substring(pinMotorPos + 1, Order.length()-1);
-
-    com->whatComand=2;
-    com->motorNumber=pinMotorText.toInt();
-    com->motorSpeed = speedText.toInt(); 
-  }
-
   if(Order.indexOf("stop") == 0)
   {
-    //seperate nachricht
-    // "Comando"-"motorNumber";
-    int cmdPos = Order.indexOf("-");
-  
-    String pinMotorText= Order.substring(cmdPos + 1, Order.length()-1);
+    WriteOrder=false;
+    Serial.println(Order);
 
-    com->whatComand=3;
-    com->motorNumber=pinMotorText.toInt();
+    //für alle Motoren von 1 bis 6 alle stopen
+    for(int i=1;i<7;i++)
+    {
+      CommandGCodeForMotor newOrder;
+      newOrder.whatComand=DriveTypesStop;
+      newOrder.motorTarget=0;
+      newOrder.motorSpeed=0;
+      newOrder.motorNumber=i;
+      com->Commands.push_back(newOrder);
+    }
+
   }
+  if(Order.indexOf("M03") == 0)
+  { 
+    WriteOrder=false;
+    Serial.println(Order);
+    int comandPosStart=4;
+    int comandPosStop=0; 
+    String TextMotor="";
+    String NummerSpeed="";
+    do
+    { 
+      comandPosStop = Order.indexOf(" ",comandPosStart);
+      if(comandPosStop==-1)
+      {
+        TextMotor = Order.substring(comandPosStart, comandPosStart+1);
+        NummerSpeed = Order.substring(comandPosStart+1, Order.length());
+      }
+      else
+      {
+        TextMotor = Order.substring(comandPosStart, comandPosStop);
+        NummerSpeed = Order.substring(comandPosStart+1, comandPosStop);
+        comandPosStart=comandPosStop+1;
+      }
 
-  if(Order.indexOf("getPos") == 0)
+      CommandGCodeForMotor newOrder;
+      newOrder.whatComand=DriveTypesDriveWithSpeed;
+      if(TextMotor[0]=='x')
+      {
+        newOrder.motorNumber=1;
+      }
+      else if(TextMotor[0]=='y')
+      {
+        newOrder.motorNumber=2;
+      }
+      else if(TextMotor[0]=='z')
+      {
+        newOrder.motorNumber=3;
+      }
+      else if(TextMotor[0]=='a')
+      {
+        newOrder.motorNumber=4;
+      }
+      else
+      {
+        newOrder.motorNumber=99;
+      }
+      
+      newOrder.motorTarget=0;
+      newOrder.motorSpeed=NummerSpeed.toInt();
+      
+      com->Commands.push_back(newOrder);
+
+      
+    }while(comandPosStop!=-1);
+
+    return;
+  }
+  if(WriteOrder)
   {
-    //seperate nachricht
-    // "Comando"-"motorNumber";
-    int cmdPos = Order.indexOf("-");
-  
-    String pinMotorText= Order.substring(cmdPos + 1, Order.length()-1);
-
-    com->whatComand=4;
-    com->motorNumber=pinMotorText.toInt();
+    Serial.println(Order);
   }
-
-  if(Order.indexOf("syn") == 0)
-  {
-    //seperate nachricht
-    // "Comando"-"motorNumber"-"motorNumber2","motorTarget";
-    int cmdPos = Order.indexOf("-");
-    int cmdPos2 = Order.indexOf("-",cmdPos+1);
-    int pinMotorPos = Order.indexOf(",");
-  
-    //String cmdText = Order.substring(0,cmdPos);
-    String pinMotorText= Order.substring(cmdPos + 1, cmdPos2);
-    String pinMotorText2= Order.substring(cmdPos2 + 1, pinMotorPos);
-    String targetText = Order.substring(pinMotorPos + 1, Order.length()-1);
-
-    com->whatComand=1;
-    com->motorNumber=pinMotorText.toInt();
-    com->motorNumber2=pinMotorText2.toInt();
-    com->motorTarget = targetText.toInt(); 
-  }
-
-  if(Order.indexOf("synnewspeed") == 0)
-  {
-    //seperate nachricht
-    // "Comando"-"motorNumber,motorNumber2,motorSpeed1,motorSpeed2";
-    int pos1 = Order.indexOf("-");
-    int pos2 = Order.indexOf(",",pos1+1);
-    int posMotorSpeed1 = Order.indexOf(",",pos2+1);
-    int posMotorSpeed2 = Order.indexOf(",",posMotorSpeed1+1);
-  
-
-
-    String motorText1= Order.substring(pos1 + 1, pos2);
-    String motorText2= Order.substring(pos2 + 1, posMotorSpeed1);
-    String speedText1 = Order.substring(posMotorSpeed1 + 1, posMotorSpeed2);
-    String speedText2 = Order.substring(posMotorSpeed2 + 1, Order.length());
-
-    com->whatComand=2;
-    com->motorNumber=motorText1.toInt();
-    com->motorNumber2=motorText2.toInt();
-    com->motorSpeed = speedText1.toInt();
-    com->motorSpeed2 = speedText2.toInt(); 
-  }
-
 }

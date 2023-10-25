@@ -236,17 +236,23 @@ var JoyStick = (function(container, parameters, callback)
 <button  style="height: 100px; width: 200px;" onclick="disconnect()"> Disconnect </button>
 <br />
 <br />
-<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorForward(1)"> Forward 1 </button>
-<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorForward(2)"> Forward 2 </button>
+<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorForward('x')"> Forward 1 x </button>
+<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorForward('y')"> Forward 2 y </button>
+<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorForward('z')"> Forward 3 z </button>
+<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorForward('a')"> Forward 4 a </button>
+<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorLinks('a')"> links </button>
 <br />
-<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorBackward(1)"> Backward 1 </button>
-<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorBackward(2)"> Backward 2 </button>
+<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorBackward('x')"> Backward 1 </button>
+<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorBackward('y')"> Backward 2 </button>
+<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorBackward('z')"> Backward 3 </button>
+<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorBackward('a')"> Backward 4 </button>
+<button style="height: 50px; width: 80px; margin-right: 30px;" onclick="speedMotorRechts('a')"> rechts </button>
 <br />
 <div class="row">
 	<div class="columnLateral">
-			<div id="joy1Div" style="width:200px;height:200px;margin:50px;border:solid"></div>
-			Posizioneewewr X:<input id="joy1PosizioneX" type="text" /><br />
-			Posizione Y:<input id="joy1PosizioneY" type="text" /><br />
+			<div id="joy1Div" style="width:600px;height:600px;margin:50px;border:solid"></div>
+			Position X:<input id="joy1PositionX" type="text" /><br />
+			Position Y:<input id="joy1PositionY" type="text" /><br />
 			X :<input id="joy1X" type="text" /><br />
 			Y :<input id="joy1Y" type="text" /><br />
 <br />
@@ -276,7 +282,7 @@ function connect()
   {
     const parts = event.data.split(/:(.+)/) 
     console.log(parts);
-    receive(parts[0], parts[1]);
+    //receive(parts[0], parts[1]);
   }
 }
 
@@ -285,113 +291,127 @@ function disconnect()
     ws.close();
     localStorage.removeItem("host");
 }
+
 function stop()
 {
-	console.log("stop");
-	ws.send("stop-1");
+	//console.log("stop");
+	ws.send("stop");
 }
-function test(){ws.send("newspeed-1,200;");}
 
-function speedMotorForward(motorNumber){ws.send("newspeed-"+motorNumber+",200;");}
-function speedMotorBackward(motorNumber){ws.send("newspeed-"+motorNumber+",-200;");}
+function speedMotorForward(motorNumber){ws.send("M03 "+motorNumber+"500");}
+function speedMotorBackward(motorNumber){ws.send("M03 "+motorNumber+"500");}
+function speedMotorRechts(motorNumber){ws.send("M03 x500 y500 z-500 a-500");}
+function speedMotorLinks(motorNumber){ws.send("M03 x-500 y-500 z500 a500");}
+
 
 </script>
 
 <script type="text/javascript">
 
-var joy1IinputPosX = document.getElementById("joy1PosizioneX");
-var joy1InputPosY = document.getElementById("joy1PosizioneY");
+var joy1InputPosX = document.getElementById("joy1PositionX");
+var joy1InputPosY = document.getElementById("joy1PositionY");
 var joy1X = document.getElementById("joy1X");
 var joy1Y = document.getElementById("joy1Y");
+
+var oltX=0;
+var oltY=0;
 
 // Create JoyStick object into the DIV 'joy1Div'
 var Joy1 = new JoyStick('joy1Div', {}, function(stickData) 
 {
-    joy1IinputPosX.value = (stickData.xPosition+10);
-    joy1InputPosY.value = stickData.yPosition;
-    joy1X.value = stickData.x;
-    joy1Y.value = stickData.y;
-
-if(stickData.x==0&&stickData.y==0)
-{
-  document.getElementById("speedleft").value= "stopp";
-  document.getElementById("speedright").value= "stopp";
-  ws.send("stop-1");
-}
-else
-{
-//quadranden bestimmen in dem ich bin
-var quadrant=0;
-var testright=0;
-var testleft=0;
-if(stickData.y>=0&&stickData.x>=0)
-{
-  quadrant=1;
-  testright=parseInt(stickData.y)-parseInt(stickData.x);
-  testleft=parseInt(stickData.y);
-}
-if(stickData.y<0&&stickData.x>=0)
-{
-  quadrant=2;
-  testleft=parseInt(stickData.y);
-  testright=-parseInt(stickData.x)+parseInt(stickData.y);
-  if(testright<-100)
-  {
-  quadrant=5;
-  var zw2=(testright+100);
-  testright=-100-zw2;
-  }
-}
-if(stickData.y<0&&stickData.x<=0)
-{
-  quadrant=3;
-  testright=parseInt(stickData.y);
-  testleft=parseInt(stickData.x)+parseInt(stickData.y);
-  if(testleft<-100)
-  {
-    quadrant=6;
-    var zw2=(testleft+100);
-    testleft=-100-zw2;
-  }
-}
-if(stickData.y>=0&&stickData.x<0)
-{
-  quadrant=4;
-  testright=parseInt(stickData.y);
-  testleft=parseInt(stickData.x)+parseInt(stickData.y);
-}
- 
-		
-
-  if(testright!=0)
-  {
-    if(testright>0)
-    {
-      testright = 1000 - (testright * 8);
-    }
-    else
-    {
-      testright = -(1000 + (testright * 8));      
-    }
-  }  
-
-  if(testleft!=0)
-  {
-    if(testleft>0)
-    {
-      testleft = 1000 - (testleft * 8);
-    }
-    else
-    {
-      testleft = -(1000 + (testleft * 8));  
-    } 
-  }
-
-  document.getElementById("speedright").value= testright;
-  document.getElementById("speedleft").value=testleft ;
   
-  ws.send("synnewspeed-1,2,"+testright+","+testleft);
-}
+    if( stickData.x==0&&
+        stickData.y==0&&
+          oltX!=0&&
+          oltY!=0)
+    {
+      document.getElementById("speedleft").value= "stopp";
+      document.getElementById("speedright").value= "stopp";
+      console.log("stop from Joystick");
+      ws.send("stop joy");
+    }
+    else if( stickData.x==0&&
+        stickData.y==0&&
+          oltX==0&&
+          oltY==0)
+    {
+      console.log("nix zu tun");
+    }
+    else
+    {
+      //darstellen und speichern
+      joy1X.value = stickData.x;
+      joy1Y.value = stickData.y;
+
+
+      //robert
+      var rightspeed=parseFloat(stickData.y);
+      var leftspeed=parseFloat(stickData.y);
+
+      var c = parseFloat(stickData.y)* (parseFloat(stickData.x)/100);
+
+      if(stickData.y>=0&&stickData.x>=0)
+      {
+        quadrant=1;
+        rightspeed=rightspeed-c;
+      } 
+      if(stickData.y<0&&stickData.x>=0)
+      {
+        quadrant=2;
+        rightspeed=rightspeed-c;
+      }
+      if(stickData.y<0&&stickData.x<=0)
+      {
+        quadrant=3;
+        leftspeed=leftspeed+c;
+      }
+      if(stickData.y>=0&&stickData.x<0)
+      {
+        quadrant=4;
+        leftspeed=leftspeed+c;
+      }
+
+      if(leftspeed!=0)
+      {
+        if(leftspeed>0)
+        {
+          leftspeed = 1000 - (leftspeed * 8);
+        }
+        else
+        {
+          leftspeed = -(1000 + (leftspeed * 8));      
+        }
+      }  
+
+      if(rightspeed!=0)
+      {
+        if(rightspeed>0)
+        {
+          rightspeed = 1000 - (rightspeed * 8);
+        }
+        else
+        {
+          rightspeed = -(1000 + (rightspeed * 8));  
+        } 
+      }
+      joy1InputPosX.value=c;
+      document.getElementById("speedright").value= parseInt(rightspeed);
+      document.getElementById("speedleft").value= parseInt(leftspeed);
+
+      ws.send("M03 y"+parseInt(leftspeed)+" a"+parseInt(leftspeed)+" z"+parseInt(rightspeed)+" x"+parseInt(rightspeed));
+    }
+    
+
+
+    joy1InputPosX.value = stickData.x;
+    joy1InputPosY.value = stickData.y;
+
+    //darstellen und speichern
+    oltX = stickData.x;
+    oltY = stickData.y;
+
+
+
 });
 
 		</script>

@@ -1,8 +1,8 @@
-#pragma once
-#include <Arduino.h>
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <WiFiManager.h>  
+//#pragma once
+//#include <Arduino.h>
+//#include <ESP8266WiFi.h>
+//#include <ESP8266WebServer.h>
+#include <WiFiManager.h>  //von tzapu
 
 class Wifi
 {
@@ -19,14 +19,16 @@ WiFiManager Wifi::manager = WiFiManager();
 void Wifi::login()
 {
   
-  //Wifi::loginInspecifictWLan("muccc.legacy-2.4GHz","Dummy");
-  //Wifi::loginInspecifictWLan("RobsTest","Dummy");
-  //Wifi::loginInspecifictWLan("Com2u.de.WLAN2","Dummy");
-  
+  //Wifi::loginInspecifictWLan("ZW public","");
+
+
   Wifi::hotspot();
+
+  
   Serial.printf("Default hostname: %s\n", WiFi.hostname().c_str());
   WiFi.setHostname("RAuto");
   WiFi.hostname("RAuto");
+  //             http://rauto/
   Serial.printf("Default hostname: %s\n", WiFi.hostname().c_str());
 }
 
@@ -65,6 +67,7 @@ void Wifi::hotspot()
   {
     return;
   }
+  //manager.resetSettings();
   manager.autoConnect("PW:passwort","passwort");
 
   Serial.println("WiFi created");

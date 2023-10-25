@@ -3,9 +3,12 @@
 class MotorBase {
 public:
   void Tick();
-  void CheckComand(NewComand* com);
+  void CheckComand(CommandGCode* com);
+  void MakeComand(CommandGCodeForMotor* order);
+
   void Initializieren(uint16_t index, uint16_t pinDirection, uint16_t pinSteps,int multiplication);
   void InitializierenWithEnable(uint16_t index, uint16_t pinDirection, uint16_t pinSteps,uint16_t pinEnable, int multiplication);
+  void InitializierenWithSleep(uint16_t index, uint16_t pinDirection, uint16_t pinSteps,uint16_t pinSleep, int multiplication);
   void Stop();
   int getPosition();
 
@@ -20,6 +23,8 @@ private:
   uint16_t motorIndex = 0;
   uint16_t motorPinDirection = 0;
   uint16_t motorPinSteps = 0;
+  uint16_t motorPinSleep=255;
+
   int motorMultiplication=1;
 
   bool lastStatus = LOW;
@@ -60,84 +65,110 @@ void MotorBase::InitializierenWithEnable(uint16_t index, uint16_t pinDirection, 
   digitalWrite(pinEnable, LOW);
 }
 
-void MotorBase::CheckComand(NewComand* com) 
+void MotorBase::InitializierenWithSleep(uint16_t index, uint16_t pinDirection, uint16_t pinSteps,uint16_t pinSleep, int multiplication) 
 {
-  int speedzw = 0;
-  if (com->whatComand != 0)  //es ist ein Beweg dich comando
+  motorIndex = index;
+  motorPinDirection = pinDirection;
+  motorPinSteps = pinSteps;
+  motorMultiplication=multiplication;
+  motorPinSleep=pinSleep;
+
+  pinMode(motorPinDirection, OUTPUT);
+  pinMode(motorPinSteps, OUTPUT);
+
+  pinMode(motorPinSleep, OUTPUT);
+  digitalWrite(motorPinSleep, LOW);
+}
+
+void MotorBase::MakeComand(CommandGCodeForMotor* order)
+{
+  // es muss ein Comando für mein Motor sein
+  // Befehl ist stop also motor anhaten
+  if (order->whatComand == DriveTypesStop) 
   {
-    if (com->whatComand == 3) 
+    ModusDesMotors = 0;
+    Serial.print("Motor Stop  ");
+    Serial.println(motorIndex);
+    return;
+  }
+  if (order->whatComand == DriveTypesDriveWithSpeed) 
+  {
+    ModusDesMotors = 3;
+    counterIntervall = 0;
+
+    int speedzw = motorMultiplication * order->motorSpeed;
+
+    if (speedzw == 0) 
     {
       ModusDesMotors = 0;
-      Serial.print("Motor Stop  ");
-      Serial.println(motorIndex);
-    } 
-    else if (com->motorNumber == motorIndex || com->motorNumber2 == motorIndex)  //der befehl geht zu meinem motor
-    {
-      switch (com->whatComand) 
-      {
-        case 1:
-          ModusDesMotors = 2;
-          motorSpeed = 200;
-          counterIntervall = 0;
-          targetCounter = targetCounter + com->motorTarget;
-          if (targetCounter > stepCounter) 
-          {
-            forward = true;
-            digitalWrite(motorPinDirection, true);
-          } 
-          else if (targetCounter < stepCounter) 
-          {
-            forward = false;
-            digitalWrite(motorPinDirection, false);
-          } 
-          else
-          {
-            Serial.println("Motor am ziel");
-          }
-          break;
-        case 2:
-          ModusDesMotors = 3;
-          counterIntervall = 0;
-
-          if (com->motorNumber == motorIndex) 
-          {
-            speedzw = motorMultiplication * com->motorSpeed;
-          }
-          if (com->motorNumber2 == motorIndex) 
-          {
-            speedzw = motorMultiplication * com->motorSpeed2;
-          }
-          if (speedzw == 0) 
-          {
-            ModusDesMotors = 0;
-            Serial.print("Motor Stop  by speed 0");
-            break;
-          }
-          if (speedzw < 0) 
-          {
-            digitalWrite(motorPinDirection, true);
-            speedzw = speedzw * -1;
-            Serial.print("backwarts ");
-          } 
-          else 
-          {
-            Serial.print("forward ");
-            digitalWrite(motorPinDirection, false);
-          }
-
-          newMotorSpeed=speedzw;
-          //newMotorSpeed = (short)(1000 - (speedzw * 6));
-          Serial.print("new speed :  ");
-          Serial.println(newMotorSpeed);
-          break;
-        case 4:
-          Serial.print("ModusDesMotors :  ");
-          Serial.println(ModusDesMotors);
-          Serial.print("Motor steps :  ");
-          Serial.println(stepCounter);
-          break;
-      }
+      Serial.print("Motor Stop  by speed 0");
+      return;
     }
+    if (speedzw < 0) 
+    {
+      digitalWrite(motorPinDirection, true);
+      speedzw = speedzw * -1;
+      Serial.print("backwarts ");
+    } 
+    else 
+    {
+      Serial.print("forward ");
+      digitalWrite(motorPinDirection, false);
+    }
+
+    newMotorSpeed=speedzw;
+    Serial.print(motorIndex);
+    Serial.print(" new speed :  ");
+    Serial.println(newMotorSpeed);
+  }
+  if (order->whatComand == DriveTypesDriveToPos)
+  {
+    ModusDesMotors = 2;
+    motorSpeed = 200;
+    counterIntervall = 0;
+    targetCounter = targetCounter + order->motorTarget;
+    if (targetCounter > stepCounter) 
+    {
+      forward = true;
+      digitalWrite(motorPinDirection, true);
+    } 
+    else if (targetCounter < stepCounter) 
+    {
+      forward = false;
+      digitalWrite(motorPinDirection, false);
+    } 
+    else
+    {
+      Serial.println("Motor am ziel");
+    }
+    return;
+  }
+  if (order->whatComand == DriveTypesGetActiveParams)
+  {
+    Serial.print("ModusDesMotors :  ");
+    Serial.println(ModusDesMotors);
+    Serial.print("Motor steps :  ");
+    Serial.println(stepCounter);
+    return;
+  }
+}
+
+void MotorBase::CheckComand(CommandGCode* com) 
+{
+  int speedzw = 0;
+  int it=0;
+
+  //wir schauen nach ob es ein comando für diesen Motor gibt
+  for (auto n : com->Commands)
+  {
+    if(n.motorNumber==motorIndex)
+    {
+      MakeComand(&n);
+      //den richtigen löschen
+      com->Commands.erase(com->Commands.begin()+it);
+      return;
+    }
+    it++;
   }
 }
 
@@ -154,7 +185,16 @@ void MotorBase::Tick()
 {
   if (ModusDesMotors == 0) 
   {
+    if(motorPinSleep!=255)
+    {
+      digitalWrite(motorPinSleep, LOW);
+    }
     return;  //Motor steht nix machen
+  }
+
+  if(motorPinSleep!=255)
+  {
+    digitalWrite(motorPinSleep, HIGH);
   }
 
   counterIntervall++;
@@ -162,22 +202,23 @@ void MotorBase::Tick()
   {
     digitalWrite(motorPinSteps, lastStatus);
 
-    //Serial.println(motorSpeed);
-    //Serial.println(stepCounter);
-    //Serial.println(targetCounter);
-    //Serial.println(ModusDesMotors);
-
     counterIntervall = 0;
 
-    if (lastStatus == LOW){
+    if (lastStatus == LOW)
+    {
       lastStatus = HIGH;
-    } else {
+    } 
+    else 
+    {
       lastStatus = LOW;
     }
 
-    if (forward){
+    if (forward)
+    {
       stepCounter++;
-    } else {
+    } 
+    else 
+    {
       stepCounter--;
     }
 
@@ -189,8 +230,6 @@ void MotorBase::Tick()
 
     if (ModusDesMotors == 3 && newMotorSpeed != 0) 
     {
-      Serial.print("new Motorspeed  ");
-      Serial.println(newMotorSpeed);
       motorSpeed = newMotorSpeed;
       newMotorSpeed = 0;
     }
