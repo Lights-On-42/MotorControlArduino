@@ -267,16 +267,25 @@ var JoyStick = (function(container, parameters, callback)
 function connect() 
 {
   let host = window.location.host;
-  if (localStorage.getItem("host") != undefined) 
-  {
-    host = localStorage.getItem("host")
-  } else {
+  if ((host = localStorage.getItem("host")) == undefined) {
     host = window.prompt("Please enter a IP adress", window.location.hostname);
     localStorage.setItem("host", host)
   }
 
   ws = new WebSocket("ws://" + host + ":81")
-  ws.onopen = (event) => {ws.send("hi");};
+  ws.onopen = (event) =>
+  {
+    ws.send("hi");
+  };
+
+  ws.onclose = (event) =>
+  {
+    console.log(`Closed to {host}: ` , event);
+    if (!event.wasClean) {
+      console.log(`Connection reset abnormally, reset`);
+      localStorage.removeItem("host");
+    }
+  };
 
   ws.onmessage = (event) => 
   {
